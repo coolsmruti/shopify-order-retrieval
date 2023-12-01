@@ -22,12 +22,12 @@ public class OrderController {
     private ExcelService excelService;
 
     @GetMapping("/generateExcel")
-    public ResponseEntity<String> generateExcel(@RequestParam String dateFilter) {
+    public ResponseEntity<String> generateExcel(@RequestParam String filter) {
         // Step-1: Fetch the order data from shopify API
-        List<Order> orders = shopifyService.getOrdersByFilter(dateFilter);
+        List<Order> orders = shopifyService.getOrdersByFilter(filter);
 
         // Step-2: Generate an excel based on the fetched order data from shopify API
-        String filePath = "D:\\git\\shopify-order-retrieval\\src\\main\\resources\\excel\\file.xlsx";
+        String filePath = "/Users/debasishsahoo/Documents/GitHub/shopify-order-retrieval/src/main/resources/excel/file.xlsx";
         excelService.generateExcel(orders, filePath);
         return ResponseEntity.ok("Excel file generated successfully");
     }

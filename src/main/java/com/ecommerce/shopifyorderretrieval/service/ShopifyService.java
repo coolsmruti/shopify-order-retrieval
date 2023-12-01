@@ -1,7 +1,6 @@
 package com.ecommerce.shopifyorderretrieval.service;
 
 import com.ecommerce.shopifyorderretrieval.configuration.ShopifyApiConfig;
-import com.ecommerce.shopifyorderretrieval.exception.UnknownDateFilterException;
 import com.ecommerce.shopifyorderretrieval.model.Order;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -10,13 +9,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
 import java.io.IOException;
 import java.net.URI;
-import java.time.DayOfWeek;
-import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -30,11 +26,10 @@ public class ShopifyService {
     @Autowired
     private RestTemplate restTemplate;
 
-    public List<Order> getOrdersByFilter(String dateFilter) {
+    public List<Order> getOrdersByFilter(String filter) {
         try {
-            // Construct the Shopify API URL with the provided dateFilter
-            String apiUrl = buildApiUrl(dateFilter);
-            log.info("Calling Shopify API with {}", apiUrl);
+            // Construct the Shopify API URL with the provided filter
+            String apiUrl = apiConfig.getUrl() + "?filter=" + filter;
 
             // Prepare headers with API key and access token
             HttpHeaders headers = new HttpHeaders();
@@ -50,20 +45,17 @@ public class ShopifyService {
             if (responseEntity.getStatusCode() == HttpStatus.OK) {
                 String jsonResponse = responseEntity.getBody();
 
+                // Log the JSON response for debugging purposes
                 log.info("Received Shopify API response: {}", jsonResponse);
 
                 // Parse the JSON response into a list of Order objects
-                return parseJsonResponse(jsonResponse);
+                List<Order> orders = parseJsonResponse(jsonResponse);
+
+                log.info("Retrieved {} orders from Shopify API for filter '{}'", orders.size(), filter);
+
+                return orders;
             } else {
                 log.error("Failed to retrieve orders from Shopify API. Status code: {}", responseEntity.getStatusCode());
-            }
-
-        } catch (HttpClientErrorException ex) {
-            if (ex.getStatusCode() == HttpStatus.NOT_FOUND) {
-                log.warn("Shopify API returned 404 Not Found for date filter: {}", dateFilter);
-                throw new UnknownDateFilterException("No orders found for the specified date filter: " + dateFilter);
-            } else {
-                log.error("Error while calling Shopify API", ex);
             }
         } catch (Exception e) {
             log.error("Error while fetching orders from Shopify API", e);
@@ -71,38 +63,6 @@ public class ShopifyService {
 
         // Return an empty list if there's an error
         return new ArrayList<>();
-    }
-
-    private String buildApiUrl(String dateFilter) {
-        String baseUrl = apiConfig.getUrl();
-
-        switch (dateFilter.toLowerCase()) {
-            case "today":
-                return baseUrl + YearMonth.now() + "/orders.json";
-            case "yesterday":
-                YearMonth lastMonth = YearMonth.now().minusMonths(1);
-                return baseUrl + lastMonth + "/orders.json";
-            case "last 7 days":
-                YearMonth sevenMonthsAgo = YearMonth.now().minusMonths(6);
-                return baseUrl + sevenMonthsAgo + "/orders.json";
-            case "this week":
-                YearMonth startOfWeek = YearMonth.from(YearMonth.now().atDay(1).with(DayOfWeek.MONDAY));
-                return baseUrl + startOfWeek + "/orders.json";
-            case "this month":
-                return baseUrl + YearMonth.now() + "/orders.json";
-            case "last 30 days":
-                YearMonth thirtyMonthsAgo = YearMonth.now().minusMonths(29);
-                return baseUrl + thirtyMonthsAgo + "/orders.json";
-            case "last month":
-                YearMonth startOfLastMonth = YearMonth.from(YearMonth.now().minusMonths(1).atDay(1));
-                return baseUrl + startOfLastMonth + "/orders.json";
-            case "custom date":
-                // Handle custom date logic
-                return baseUrl + dateFilter + "/orders.json";
-            default:
-                log.warn("Unknown date filter: {} for the order retrieval", dateFilter);
-                throw new UnknownDateFilterException("Unknown date filter: " + dateFilter + " for order retrieval");
-        }
     }
 
     private List<Order> parseJsonResponse(String jsonResponse) {
